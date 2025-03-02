@@ -1,5 +1,10 @@
-provider "aws" {
-  region = local.region
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 
 locals {
@@ -125,12 +130,17 @@ module "alb" {
     }
   }
 
-  security_group_egress_rules = { for subnet in var.private_subnet_objects :
-    (subnet.availability_zone) => {
+  security_group_egress_rules = {
+    for subnet in var.private_subnet_objects :
+    "egress-${subnet.availability_zone}" => {
+      from_port   = 0
+      to_port     = 0
       ip_protocol = "-1"
+      description = "Allow all egress traffic to ${subnet.availability_zone} CIDR block"
       cidr_ipv4   = subnet.cidr_block
     }
   }
+
 
   listeners = {
     http = {

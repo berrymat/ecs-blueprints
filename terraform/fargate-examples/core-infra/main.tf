@@ -1,5 +1,10 @@
-provider "aws" {
-  region = local.region
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 
 data "aws_availability_zones" "available" {}
@@ -19,8 +24,8 @@ data "aws_route_table" "default" {
 }
 
 locals {
-  name   = "core-infra"
-  region = "eu-west-2"
+  name   = var.name
+  region = var.region
 
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -160,10 +165,4 @@ resource "aws_route" "new_to_default" {
   route_table_id            = module.vpc.default_route_table_id
   destination_cidr_block    = local.default_vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.default_to_new.id
-}
-
-# Get the list of subnets
-data "aws_subnet" "private_subnets" {
-  for_each = { for i, subnet_id in module.vpc.private_subnets : local.azs[i] => subnet_id }
-  id       = each.value
 }
