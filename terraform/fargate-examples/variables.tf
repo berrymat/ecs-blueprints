@@ -4,11 +4,11 @@ variable "dev_region" {
   description = "Region for dev infrastructure"
 }
 
-#variable "prod_region" {
-#    type = string
-#    default = "eu-west-1"
-#    description = "Region for prod infrastructure"
-#}
+variable "prod_region" {
+  type        = string
+  default     = "eu-west-1"
+  description = "Region for prod infrastructure"
+}
 
 variable "name" {
   type        = string

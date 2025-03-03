@@ -35,3 +35,8 @@ variable "private_subnet_objects" {
   }))
   description = "A list of private subnet objects"
 }
+
+variable "stage_name" {
+  type        = string
+  description = "Name of the stage for the API gateway"
+}

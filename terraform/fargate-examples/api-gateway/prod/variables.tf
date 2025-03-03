@@ -11,5 +11,10 @@ variable "name" {
 variable "stage_name" {
   type        = string
   description = "Name of the stage for the API gateway"
-  default     = "dev"
+  default     = "prod"
+}
+
+variable "lb_service_url" {
+  type        = string
+  description = "URL of the load balancer service"
 }

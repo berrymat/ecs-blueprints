@@ -37,7 +37,7 @@ module "ecs_service" {
 
   container_definitions = {
     (local.container_name) = {
-      image                    = var.ecr_repository_url
+      image                    = "${var.ecr_repository_url}:${var.stage_name}"
       readonly_root_filesystem = false
 
       port_mappings = [
@@ -133,8 +133,6 @@ module "alb" {
   security_group_egress_rules = {
     for subnet in var.private_subnet_objects :
     "egress-${subnet.availability_zone}" => {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       description = "Allow all egress traffic to ${subnet.availability_zone} CIDR block"
       cidr_ipv4   = subnet.cidr_block
@@ -164,7 +162,7 @@ module "alb" {
         healthy_threshold   = 5
         interval            = 30
         matcher             = "200-299"
-        path                = "/api/health"
+        path                = "/health"
         port                = "traffic-port"
         protocol            = "HTTP"
         timeout             = 5

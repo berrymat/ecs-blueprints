@@ -14,10 +14,10 @@ provider "aws" {
   alias  = "dev"
 }
 
-#provider "aws" {
-#  region = var.prod_region
-#  alias = "prod"
-#}
+provider "aws" {
+  region = var.prod_region
+  alias  = "prod"
+}
 
 module "state_management" {
   source = "./state-management"
@@ -60,16 +60,18 @@ module "lb_service_dev" {
   public_subnets                 = module.core_infra_dev.public_subnets
   private_subnets                = module.core_infra_dev.private_subnets
   private_subnet_objects         = module.core_infra_dev.private_subnet_objects
+  stage_name                     = "dev"
 }
 
 module "api_gateway_dev" {
-  source     = "./api-gateway"
-  name       = "${var.name}-dev"
+  source     = "./api-gateway/dev"
+  name       = var.name
   region     = var.dev_region
   stage_name = "dev"
   providers = {
     aws = aws.dev
   }
+  lb_service_url = module.lb_service_dev.application_url
 }
 
 #module "lb_service_prod" {
@@ -84,14 +86,16 @@ module "api_gateway_dev" {
 #  public_subnets                 = module.core_infra_prod.public_subnets
 #  private_subnets                = module.core_infra_prod.private_subnets
 #  private_subnet_objects         = module.core_infra_prod.private_subnet_objects
+#  stage_name                     = "prod"
 #}
 
 #module "api_gateway_prod" {
-#  source = "./api-gateway"
-#  name   = "${var.name}-prod"
+#  source = "./api-gateway/prod"
+#  name   = var.name
 #  region = var.prod_region
 #  stage_name = "prod"
 #  providers = {
 #    aws = aws.prod
 #  }
+#  lb_service_url = module.lb_service_prod.application_url
 #}
