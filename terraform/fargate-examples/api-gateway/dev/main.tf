@@ -111,6 +111,30 @@ resource "aws_cognito_user_pool_domain" "this" {
 
 resource "aws_cognito_user_pool" "this" {
   name = "${var.name}-user-pool"
+  
+  # Add UI customization
+  admin_create_user_config {
+    allow_admin_create_user_only = false
+  }
+  
+  auto_verified_attributes = ["email"]
+  
+  # Configure password policy
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = true
+    require_uppercase = true
+  }
+  
+  # Enable some features
+  mfa_configuration = "OFF"
+  
+  # UI customization
+  user_pool_add_ons {
+    advanced_security_mode = "OFF"
+  }
 }
 
 resource "aws_cognito_user_pool_client" "this" {
@@ -124,6 +148,36 @@ resource "aws_cognito_user_pool_client" "this" {
   prevent_user_existence_errors        = "ENABLED"
 }
 
+# Second client for user-based authentication (mobile)
+resource "aws_cognito_user_pool_client" "user_auth" {
+  name                                 = "${var.name}-user-auth-client"
+  user_pool_id                         = aws_cognito_user_pool.this.id
+  generate_secret                      = true
+  explicit_auth_flows                  = [
+    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_USER_SRP_AUTH", 
+    "ALLOW_REFRESH_TOKEN_AUTH"
+  ]
+  allowed_oauth_flows                  = ["code", "implicit"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile", "api/health"]
+  allowed_oauth_flows_user_pool_client = true
+  prevent_user_existence_errors        = "ENABLED"
+  
+  # UI customization for Auth screen
+  supported_identity_providers         = ["COGNITO"]
+  
+  # Support mobile apps and web apps
+  callback_urls                        = [
+    "https://dev-api.cleanlinkportal.co.uk/callback",
+    "com.cleanlinkportal.app://callback",
+    "https://oauth.pstmn.io/v1/browser-callback"
+  ]
+  default_redirect_uri                 = "https://oauth.pstmn.io/v1/browser-callback"
+  
+  # Add logout URLs
+  logout_urls                          = ["https://dev-api.cleanlinkportal.co.uk/logout"]
+}
+
 ################################################################################
 # Cognito Authorizer
 ################################################################################
@@ -134,7 +188,7 @@ resource "aws_apigatewayv2_authorizer" "this" {
   authorizer_type  = "JWT"
   identity_sources = ["$request.header.Authorization"]
   jwt_configuration {
-    audience = [aws_cognito_user_pool_client.this.id]
+    audience = [aws_cognito_user_pool_client.this.id, aws_cognito_user_pool_client.user_auth.id]
     issuer   = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.this.id}"
   }
 }

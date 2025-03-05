@@ -17,7 +17,7 @@ locals {
 # ACM Certificates
 ################################################################################
 
-# Prod Certificate in eu-west-1
+# Prod Certificate in eu-west-2
 resource "aws_acm_certificate" "prod_api_cert" {
   provider                  = aws.prod
   domain_name               = "api.cleanlinkportal.co.uk"
@@ -40,13 +40,34 @@ resource "aws_acm_certificate_validation" "prod_api_cert_validation" {
 ################################################################################
 # API Gateway
 ################################################################################
+resource "aws_apigatewayv2_api" "this" {
+  name          = "${var.name}-api"
+  protocol_type = "HTTP"
+}
+
+# Define a resource and method
+resource "aws_apigatewayv2_route" "api_route" {
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "ANY /{proxy+}" # Greedy path variable to match any path
+  target             = "integrations/${aws_apigatewayv2_integration.http_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.this.id
+}
+
+# Integration with the load balancer
+resource "aws_apigatewayv2_integration" "http_integration" {
+  api_id             = aws_apigatewayv2_api.this.id
+  integration_type   = "HTTP_PROXY"
+  integration_uri    = "${var.lb_service_url}/{proxy}"
+  integration_method = "ANY"
+}
 
 resource "aws_cloudwatch_log_group" "api_gateway_logs" {
   name              = "/aws/api_gateway/${var.name}-api-logs"
   retention_in_days = 30 # Adjust as needed
   tags = {
     Name        = "${var.name}-api-log-group"
-    Environment = "dev"
+    Environment = "prod"
   }
 }
 
@@ -57,29 +78,8 @@ resource "aws_apigatewayv2_stage" "this" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
-
-    format = "$context.identity.sourceIp - - [$context.requestTime] \"$context.httpMethod $context.routeKey $context.protocol\" $context.status $context.responseLength $context.requestId"
+    format          = "$context.identity.sourceIp - - [$context.requestTime] \"$context.httpMethod $context.routeKey $context.protocol\" $context.status $context.responseLength $context.requestId"
   }
-}
-
-resource "aws_apigatewayv2_api" "this" {
-  name          = "${var.name}-api"
-  protocol_type = "HTTP"
-}
-# Define a resource and method
-resource "aws_apigatewayv2_route" "api_route" {
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "GET /api/health" # Example route
-  target             = "integrations/${aws_apigatewayv2_integration.http_integration.id}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.this.id
-}
-# Mock integration for testing
-resource "aws_apigatewayv2_integration" "http_integration" {
-  api_id             = aws_apigatewayv2_api.this.id
-  integration_type   = "HTTP_PROXY"
-  integration_uri    = var.lb_service_url
-  integration_method = "ANY"
 }
 
 ################################################################################
@@ -103,6 +103,43 @@ resource "aws_apigatewayv2_api_mapping" "prod_api_mapping" {
 }
 
 ################################################################################
+# Cognito User Pool - Using the one from dev via SSM parameters
+################################################################################
+
+# Get Cognito data from SSM parameters (dev environment)
+data "aws_ssm_parameter" "user_pool_id" {
+  provider = aws.dev
+  name     = "/${var.name}/user_pool_id"
+}
+
+data "aws_ssm_parameter" "user_pool_client_id" {
+  provider = aws.dev
+  name     = "/${var.name}/user_pool_client_id"
+}
+
+data "aws_ssm_parameter" "user_pool_client_auth_id" {
+  provider = aws.dev
+  name     = "/${var.name}/user_pool_client_auth_id"
+}
+
+data "aws_cognito_user_pool" "this" {
+  provider     = aws.dev
+  user_pool_id = data.aws_ssm_parameter.user_pool_id.value
+}
+
+data "aws_cognito_user_pool_client" "this" {
+  provider     = aws.dev
+  user_pool_id = data.aws_cognito_user_pool.this.id
+  client_id    = data.aws_ssm_parameter.user_pool_client_id.value
+}
+
+data "aws_cognito_user_pool_client" "user_auth" {
+  provider     = aws.dev
+  user_pool_id = data.aws_cognito_user_pool.this.id
+  client_id    = data.aws_ssm_parameter.user_pool_client_auth_id.value
+}
+
+################################################################################
 # Cognito Authorizer
 ################################################################################
 
@@ -112,30 +149,9 @@ resource "aws_apigatewayv2_authorizer" "this" {
   authorizer_type  = "JWT"
   identity_sources = ["$request.header.Authorization"]
   jwt_configuration {
-    audience = [data.aws_cognito_user_pool_client.this.id]
+    audience = [data.aws_cognito_user_pool_client.this.id, data.aws_cognito_user_pool_client.user_auth.id]
     issuer   = "https://cognito-idp.${local.region}.amazonaws.com/${data.aws_cognito_user_pool.this.id}"
   }
-}
-
-################################################################################
-# Data
-################################################################################
-data "aws_cognito_user_pool" "this" {
-  provider     = aws.dev
-  user_pool_id = data.aws_ssm_parameter.user_pool_id.value
-}
-data "aws_cognito_user_pool_client" "this" {
-  provider     = aws.dev
-  user_pool_id = data.aws_cognito_user_pool.this.id
-  client_id    = data.aws_ssm_parameter.user_pool_client_id.value
-}
-data "aws_ssm_parameter" "user_pool_id" {
-  provider = aws.dev
-  name     = "/${var.name}/user_pool_id"
-}
-data "aws_ssm_parameter" "user_pool_client_id" {
-  provider = aws.dev
-  name     = "/${var.name}/user_pool_client_id"
 }
 
 ################################################################################
@@ -191,5 +207,10 @@ resource "aws_iam_role_policy" "cloudwatch_policy" {
 
 provider "aws" {
   alias  = "prod"
+  region = var.region
+}
+
+provider "aws" {
+  alias  = "dev"
   region = var.region
 }
