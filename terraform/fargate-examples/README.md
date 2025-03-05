@@ -1,8 +1,8 @@
-CleanLink Portal API - Terraform Infrastructure
+# CleanLink Portal API - Terraform Infrastructure
 
 This repository contains modular Terraform configurations for deploying a containerized application on AWS Fargate with API Gateway and Cognito authentication. The infrastructure is designed to be scalable, secure, and easily maintainable across development and production environments.
 
-Architecture Overview
+## Architecture Overview
 
 The infrastructure follows a layered approach with modular components:
 
@@ -19,9 +19,9 @@ The infrastructure follows a layered approach with modular components:
      class A,B,C,D,E aws;
 ```
 
-Modules
+## Modules
 
-State Management
+### State Management
 
 - Purpose: Manages Terraform state for all infrastructure
 - AWS Services: S3, DynamoDB
@@ -30,7 +30,7 @@ State Management
   - DynamoDB table for state locking
   - Encryption and access controls
 
-Core Infrastructure
+### Core Infrastructure
 
 - Purpose: Provides the foundational network and compute resources
 - AWS Services: VPC, ECS, CloudMap, Security Groups
@@ -41,7 +41,7 @@ Core Infrastructure
   - Security groups for container traffic
   - VPC peering with default VPC for database connectivity
 
-Container Registry
+### Container Registry
 
 - Purpose: Stores and manages Docker container images
 - AWS Services: ECR
@@ -49,7 +49,7 @@ Container Registry
   - ECR repository for application images
   - Integration with ECS deployment
 
-Load Balanced Service
+### Load Balanced Service
 
 - Purpose: Deploys containerized applications with proper networking
 - AWS Services: ECS Fargate, ALB, CloudWatch, Service Discovery
@@ -60,7 +60,7 @@ Load Balanced Service
   - CloudWatch logging and monitoring
   - Service discovery integration
 
-API Gateway
+### API Gateway
 
 - Purpose: Provides secure API endpoints with authentication
 - AWS Services: API Gateway, Cognito, ACM, CloudWatch, Route53
@@ -73,14 +73,14 @@ API Gateway
   - JWT authorization for API requests
   - Comprehensive logging and monitoring
 
-Environment Support
+## Environment Support
 
 The infrastructure supports both development and production environments:
 
 - Development: Fully deployed environment for testing and development
 - Production: Configured but commented out in the root module, sharing the same Cognito authentication from development via SSM parameters
 
-Getting Started
+## Getting Started
 
 1. Initialize Terraform:
    terraform init
@@ -88,18 +88,17 @@ Getting Started
    terraform apply
 3. Access the API:
 
+   - Development: https://dev-api.cleanlinkportal.co.uk
+   - Authentication: https://cleanlink-auth-portal-api.auth.eu-west-2.amazoncognito.com
 
-    - Development: https://dev-api.cleanlinkportal.co.uk
-    - Authentication: https://cleanlink-auth-portal-api.auth.eu-west-2.amazoncognito.com
-
-Authentication
+## Authentication
 
 Two authentication methods are supported:
 
 1. Server-to-server: Uses client credentials flow with client ID/secret
 2. User authentication: Uses authorization code or implicit flow with username/password
 
-API Usage
+## API Usage
 
 Example using Postman:
 
