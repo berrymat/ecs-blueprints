@@ -1,91 +1,115 @@
-# Fargate Examples
+CleanLink Portal API - Terraform Infrastructure
 
-This folder contains solution blueprints that are meant to address end-to-end requirements for specific scenarios. An example of a scenario would be a new user, without existing ECS Fargate infrastructure, looking to build, deploy, and run a load balanced service.
+This repository contains modular Terraform configurations for deploying a containerized application on AWS Fargate with API Gateway and Cognito authentication. The infrastructure is designed to be scalable, secure, and easily maintainable across development and production environments.
 
-## Modules
+Architecture Overview
 
-These modules work together to create a working fargate setup.
+The infrastructure follows a layered approach with modular components:
 
-- **[state-management](./state-management/README.md):** This module creates the S3 bucket and DynamoDB table necessary to store Terraform state remotely. It should be deployed first.
-- **[core-infra](./core-infra/README.md):** This module sets up the core ECS Fargate infrastructure, including the VPC, ECS cluster, and service discovery.
-- **[lb-service](./lb-service/README.md):** This module demonstrates how to deploy and run a load-balanced service on Fargate, using the infrastructure created by `core-infra`.
+```mermaid
+ graph TD
+     A[API Gateway<br>+ Cognito Auth] --> B[Load Balanced<br>ECS Service]
+     B --> C[Container<br>Application]
+     A --> D[Core Infrastructure]
+     B --> D
+     C --> D
+     D[Core Infrastructure<br>VPC, Subnets, Security Groups, ECS Cluster] --> E[State Management<br>S3 Bucket, DynamoDB Locking]
 
-## Getting Started
-
-For first-time users, the recommended order of deployment is:
-
-1.  **[state-management](./state-management/README.md):** Deploy this module first to create the infrastructure for remote state storage. This will allow all other modules to store their state remotely.
-2.  **[core-infra](./core-infra/README.md):** Deploy this module to set up the required ECS Fargate infrastructure.
-3.  **[lb-service](./lb-service/README.md):** Deploy this module to see an example of a load-balanced service running on the infrastructure from `core-infra`.
-
-## Remote State Storage
-
-All modules should be configured to use remote state storage using the S3 bucket and DynamoDB table created by the `state-management` module.
-
-### Setting up Remote State
-
-To set up remote state, follow these steps.
-
-1. Create the `backend.tfvars` file in the root of the project, next to the `state-management` folder.
-
-```terraform
-bucket         = "cleanlink-portal-api-terraform-state-eu-west-2" # Update this value
-region         = "eu-west-2" #Update this value
-dynamodb_table = "cleanlink-portal-api-terraform-state-lock-table" # Update this value
+     classDef aws fill:#FF9900,stroke:#232F3E,color:white;
+     class A,B,C,D,E aws;
 ```
 
-Run the apply command in the root of the project.
+Modules
 
-```
-$ terraform apply
-```
+State Management
 
-Run the init command in the state-management folder.
+- Purpose: Manages Terraform state for all infrastructure
+- AWS Services: S3, DynamoDB
+- Key Features:
+  - S3 bucket for state storage with versioning
+  - DynamoDB table for state locking
+  - Encryption and access controls
 
-```
-$ terraform init -backend-config=../backend.tfvars
-```
+Core Infrastructure
 
-Update the backend.tf file in the state-management folder to look like this.
+- Purpose: Provides the foundational network and compute resources
+- AWS Services: VPC, ECS, CloudMap, Security Groups
+- Key Features:
+  - VPC with public/private subnets across 3 AZs
+  - ECS Fargate cluster with capacity providers
+  - Service discovery namespace
+  - Security groups for container traffic
+  - VPC peering with default VPC for database connectivity
 
-```terraform
-terraform {
-  backend "s3" {
-    key     = "state-management/terraform.tfstate"
-    encrypt = true
-  }
-}
-```
+Container Registry
 
-Run the apply command.
+- Purpose: Stores and manages Docker container images
+- AWS Services: ECR
+- Key Features:
+  - ECR repository for application images
+  - Integration with ECS deployment
 
-```
-$ terraform apply
-```
+Load Balanced Service
 
-### Configuring backend.tf for Modules
+- Purpose: Deploys containerized applications with proper networking
+- AWS Services: ECS Fargate, ALB, CloudWatch, Service Discovery
+- Key Features:
+  - ECS service deployment with Fargate
+  - Application Load Balancer for request distribution
+  - Health checks and autoscaling
+  - CloudWatch logging and monitoring
+  - Service discovery integration
 
-When creating a new module, you'll need to add a backend.tf file in the root of the module directory. This tells Terraform to store its state remotely. Here's how to configure it:
+API Gateway
 
-Create a new file in the root of your module, and add the following.
+- Purpose: Provides secure API endpoints with authentication
+- AWS Services: API Gateway, Cognito, ACM, CloudWatch, Route53
+- Key Features:
+  - HTTP API Gateway with custom domain
+  - SSL certificates for secure connections
+  - Cognito user pools for authentication with two client types:
+    - Server-to-server via client credentials flow
+    - User authentication via authorization code flow
+  - JWT authorization for API requests
+  - Comprehensive logging and monitoring
 
-```terraform
-terraform {
-  backend "s3" {
-    key            = "<PUT MODULE NAME HERE>/terraform.tfstate" # Customize the key (path/filename)
-    encrypt        = true                                       # Enable server-side encryption
-  }
-}
-```
+Environment Support
 
-Make sure when running terraform init in the module directory, you specify the -backend-config=../backend.tfvars flag to point to the common remote state configuration.
+The infrastructure supports both development and production environments:
 
-```
-$ terraform init -backend-config=../backend.tfvars
-```
+- Development: Fully deployed environment for testing and development
+- Production: Configured but commented out in the root module, sharing the same Cognito authentication from development via SSM parameters
 
-Run the apply command.
+Getting Started
 
-```
-$ terraform apply
-```
+1. Initialize Terraform:
+   terraform init
+2. Deploy the infrastructure:
+   terraform apply
+3. Access the API:
+
+
+    - Development: https://dev-api.cleanlinkportal.co.uk
+    - Authentication: https://cleanlink-auth-portal-api.auth.eu-west-2.amazoncognito.com
+
+Authentication
+
+Two authentication methods are supported:
+
+1. Server-to-server: Uses client credentials flow with client ID/secret
+2. User authentication: Uses authorization code or implicit flow with username/password
+
+API Usage
+
+Example using Postman:
+
+- Authentication: OAuth 2.0
+- Grant Type: Authorization Code (for user auth) or Client Credentials (for server auth)
+- Auth URL: https://cleanlink-auth-portal-api.auth.eu-west-2.amazoncognito.com/oauth2/authorize
+- Token URL: https://cleanlink-auth-portal-api.auth.eu-west-2.amazoncognito.com/oauth2/token
+- Callback URL: https://oauth.pstmn.io/v1/browser-callback
+- Scope: openid email profile api/health
+
+---
+
+This infrastructure is designed to be secure, scalable, and maintainable with modular components that can be independently updated and expanded.
