@@ -1,0 +1,1 @@
+terraform fmt -recursive -write=true -diff=true -check=false -list=true
